@@ -1,0 +1,58 @@
+name: Gold & Silver Rates
+
+on:
+  schedule:
+    # GitHub cron uses UTC. IST = UTC + 5:30
+    - cron: "0 6 * * *"    # 11:30 AM IST
+    - cron: "30 9 * * *"   # 03:00 PM IST
+  workflow_dispatch:        # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: write           # needed to commit the updated Excel files
+
+concurrency:
+  group: metal-rates
+  cancel-in-progress: false
+
+jobs:
+  fetch-rates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch rates and update Excel
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # optional, only for other websites
+        run: python metal_rates_agent.py
+
+      - name: Commit updated Excel files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gold_rates.xlsx silver_rates.xlsx
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Rates update $(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M IST')"
+            git push
+          fi
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-log-${{ github.run_number }}
+          path: agent.log
+          if-no-files-found: ignore
+          retention-days: 14

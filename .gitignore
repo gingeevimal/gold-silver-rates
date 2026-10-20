@@ -1,0 +1,5 @@
+agent.log
+agent_console.log
+__pycache__/
+*_20*.xlsx
+~$*.xlsx

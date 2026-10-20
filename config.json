@@ -1,0 +1,24 @@
+{
+  "excel_files": {
+    "Gold": "gold_rates.xlsx",
+    "Silver": "silver_rates.xlsx"
+  },
+  "timezone": "Asia/Kolkata",
+  "use_llm_fallback": true,
+  "backfill_last_10_days": true,
+  "llm_model": "claude-sonnet-5-5",
+  "sources": [
+    {
+      "name": "GoodReturns Chennai Gold",
+      "city": "Chennai",
+      "metal": "Gold",
+      "url": "https://www.goodreturns.in/gold-rates/chennai.html"
+    },
+    {
+      "name": "GoodReturns Chennai Silver",
+      "city": "Chennai",
+      "metal": "Silver",
+      "url": "https://www.goodreturns.in/silver-rates/chennai.html"
+    }
+  ]
+}
