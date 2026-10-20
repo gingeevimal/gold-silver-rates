@@ -26,7 +26,7 @@ SERIES = {
 LINE_COLOR = {"Gold": "#B07A12", "Silver": "#5B6B7F"}
 RANGES = {"7 days": 7, "1 month": 30, "3 months": 90, "1 year": 365, "All": None}
 
-st.set_page_config(page_title="Gold & Silver Rates", page_icon="🪙", layout="wide")
+st.set_page_config(page_title="Gold & Silver Rates", page_icon=":material/paid:", layout="wide")
 
 
 # ---------------------------------------------------------------- data
@@ -74,11 +74,11 @@ def signed(v) -> str | None:
     if v is None or pd.isna(v):
         return None
     v = round(float(v))
-    return f"{'+' if v > 0 else '−' if v < 0 else ''}{inr(abs(v))[1:]}"
+    return f"{'+' if v > 0 else '-' if v < 0 else ''}{inr(abs(v))[1:]}"
 
 
 # ---------------------------------------------------------------- UI
-st.title("🪙 Gold & Silver Rates")
+st.title("Chennai Gold & Silver Rates")
 
 available = {m: p for m, p in FILES.items() if p.exists()}
 if not available:
@@ -114,7 +114,7 @@ for col, s in zip(cols, SERIES[metal]):
 
 st.divider()
 
-tab_trend, tab_research = st.tabs(["📈 Trend", "🔎 Research"])
+tab_trend, tab_research = st.tabs(["Trend", "Research"])
 
 with tab_trend:
     # Trend chart: one series at a time on one axis
