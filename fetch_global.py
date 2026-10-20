@@ -1,0 +1,107 @@
+"""
+Global gold & silver data for the dashboard's Global screen and Technical tabs.
+
+1. global_history.csv : long daily OHLC history of COMEX gold & silver futures (USD per troy ounce)
+                        plus USD/INR, from Yahoo Finance. Used for charts and technical analysis.
+2. global_rates.csv   : a snapshot of the live spot price from goldprice.org (USD and INR) appended
+                        on every run, so you build your own history of the global rate.
+
+Run:  python fetch_global.py
+"""
+
+from __future__ import annotations
+
+import sys
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import pandas as pd
+import requests
+
+BASE = Path(__file__).resolve().parent
+HISTORY_CSV = BASE / "global_history.csv"
+RATES_CSV = BASE / "global_rates.csv"
+TICKERS = {"Gold": "GC=F", "Silver": "SI=F"}
+TROY_OUNCE_G = 31.1034768
+FEED = "https://data-asg.goldprice.org/dbXRates/{cur}"
+FEED_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/128.0 Safari/537.36",
+    "Referer": "https://goldprice.org/",
+    "Origin": "https://goldprice.org",
+    "Accept": "application/json, text/plain, */*",
+}
+
+
+# ------------------------------------------------------------- goldprice.org
+def live_spot(currencies=("USD", "INR"), timeout: int = 10) -> dict:
+    """Live spot from goldprice.org. Returns {'date': str, 'items': {CUR: {...}}} (prices per troy ounce)."""
+    r = requests.get(FEED.format(cur=",".join(currencies)), headers=FEED_HEADERS, timeout=timeout)
+    r.raise_for_status()
+    j = r.json()
+    items = {it["curr"]: it for it in j.get("items", [])}
+    if not items:
+        raise RuntimeError("goldprice.org returned no prices")
+    return {"date": j.get("date", ""), "ts": j.get("ts"), "items": items}
+
+
+def snapshot() -> int:
+    """Append the current goldprice.org spot (USD + INR) to global_rates.csv."""
+    data = live_spot(("USD", "INR"))
+    now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    rows = []
+    for cur, it in data["items"].items():
+        for metal, k in (("Gold", "Xau"), ("Silver", "Xag")):
+            rows.append({
+                "Date": now.strftime("%Y-%m-%d"), "Time (IST)": now.strftime("%H:%M"),
+                "Feed time": data["date"], "Metal": metal, "Currency": cur,
+                "Per oz": it[f"{k.lower()}Price"],
+                "Change": it[f"chg{k}"],
+                "Change %": it[f"pc{k}"],
+                "Prev close": it[f"{k.lower()}Close"],
+            })
+    df = pd.DataFrame(rows)
+    if RATES_CSV.exists():
+        df = pd.concat([pd.read_csv(RATES_CSV), df], ignore_index=True)
+    df.to_csv(RATES_CSV, index=False)
+    return len(rows)
+
+
+# ------------------------------------------------------------- long history
+def _hist(symbol: str, period: str) -> pd.DataFrame:
+    import yfinance as yf
+    df = yf.Ticker(symbol).history(period=period, interval="1d", auto_adjust=False)
+    if df.empty:
+        raise RuntimeError(f"No data for {symbol}")
+    df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
+    return df[["Open", "High", "Low", "Close"]]
+
+
+def build(period: str = "10y") -> pd.DataFrame:
+    """Daily OHLC in USD per troy ounce + USDINR, both metals stacked."""
+    fx = _hist("INR=X", period)["Close"].rename("USDINR")
+    frames = []
+    for metal, sym in TICKERS.items():
+        df = _hist(sym, period).join(fx, how="left")
+        df["USDINR"] = df["USDINR"].ffill().bfill()
+        df["Metal"] = metal
+        frames.append(df.dropna(subset=["Close"])[["Metal", "Open", "High", "Low", "Close", "USDINR"]])
+    return pd.concat(frames).reset_index(names="Date").sort_values(["Metal", "Date"]).round(4)
+
+
+if __name__ == "__main__":
+    # Each part is independent: a failure in one never stops the daily job.
+    try:
+        n = snapshot()
+        print(f"goldprice.org snapshot: {n} rows appended to {RATES_CSV.name}")
+    except Exception as e:
+        print(f"goldprice.org snapshot skipped: {e}")
+    try:
+        data = build()
+        data.to_csv(HISTORY_CSV, index=False)
+        print(f"Saved {len(data)} rows to {HISTORY_CSV.name}: "
+              + ", ".join(f"{m} {g['Date'].min():%Y-%m-%d}..{g['Date'].max():%Y-%m-%d}" for m, g in data.groupby("Metal")))
+    except Exception as e:
+        print(f"Long history not updated: {e}")
+    sys.exit(0)

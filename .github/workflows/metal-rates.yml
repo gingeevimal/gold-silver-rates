@@ -36,11 +36,15 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # optional, only for other websites
         run: python metal_rates_agent.py
 
+      - name: Update long price history (international, for technical analysis)
+        run: python fetch_global.py
+
       - name: Commit updated Excel files
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add gold_rates.xlsx silver_rates.xlsx
+          git add global_history.csv global_rates.csv 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else

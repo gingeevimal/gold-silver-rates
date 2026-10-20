@@ -4,4 +4,5 @@ openpyxl>=3.1
 tzdata>=2024.1        # timezone data on Windows
 pandas>=2.0
 streamlit>=1.50
+yfinance>=0.2.40   # long price history for the Technical tab
 anthropic>=0.40       # optional: only for the LLM fallback on unfamiliar sites

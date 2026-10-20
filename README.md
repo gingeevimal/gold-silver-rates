@@ -4,7 +4,14 @@ Collects Chennai gold and silver rates every day, keeps the full history in Exce
 
 - **Agent** (`metal_rates_agent.py`): fetches rates from goodreturns.in. On each run it also back-fills any missing days from the site's "last 10 days" table.
 - **Schedule** (`.github/workflows/metal-rates.yml`): GitHub Actions runs the agent at 11:30 AM and 3:00 PM IST and commits the Excel files.
-- **Dashboard** (`app.py`): today's rates, a trend chart, a daily table, a live check, and a **Research** tab with change over 1W/1M/3M/6M/1Y/YTD, highs and lows, average, volatility, streaks, a month-by-month table, a weekday pattern, and the gold-to-silver ratio.
+- **Dashboard** (`app.py`) has two screens:
+  - **Chennai (India)** (`views/chennai.py`): today's rates, a daily table with ▲/▼ change and % columns, and three tabs:
+    - **Trend**
+    - **Research**: 1W–1Y/YTD moves, highs and lows, volatility, streaks, a monthly table, a weekday pattern and the gold-to-silver ratio
+    - **Technical**: candlesticks, moving averages, Bollinger Bands, the trend channel, flag patterns, support/resistance, Fibonacci levels, RSI, MACD, a bottom watch, an outlook bias and statistical price ranges
+  - **Global** (`views/global_rates.py`): live spot from goldprice.org in any currency and unit, a Chennai-vs-global premium table, a saved global history with change columns, and technical analysis of COMEX gold and silver in USD or INR.
+- **Global data** (`fetch_global.py`): runs on the same schedule. It saves a goldprice.org snapshot to `global_rates.csv` and 10 years of COMEX history (Yahoo Finance) to `global_history.csv`.
+- **Analysis code** (`technical.py`): the indicators and pattern detection. Patterns and ranges describe price behaviour and probabilities, not certainties, and are not investment advice.
 
 Run the dashboard locally: `streamlit run app.py`. To host it, deploy `app.py` from this repo on Streamlit Community Cloud (share.streamlit.io). It redeploys whenever the workflow commits new rates.
 
