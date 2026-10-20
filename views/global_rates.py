@@ -58,7 +58,7 @@ def signed(v, cur: str, dec: int | None = None) -> str | None:
 # ---------------------------------------------------------------- data
 @st.cache_data(ttl=55, show_spinner=False)
 def get_live(currencies: tuple[str, ...]) -> dict:
-    return FG.live_spot(currencies)
+    return FG.live_spot_any(currencies)
 
 
 def fallback_spot() -> dict | None:
@@ -110,7 +110,8 @@ def chennai_latest() -> dict:
 
 # ---------------------------------------------------------------- UI
 st.title("Global Gold & Silver Rates")
-st.caption("Live spot prices from goldprice.org (per troy ounce, converted to your unit). "
+st.caption("Live spot prices from goldprice.org, or gold-api.com where goldprice.org is not reachable "
+           "(per troy ounce, converted to your unit). "
            "International spot excludes India's import duty and local premium. See the comparison below.")
 
 c1, c2 = st.columns([1, 2])
@@ -137,14 +138,20 @@ def live_panel(cur: str, mult: float, ushort: str):
 
     st.markdown(f"##### Spot price per {ushort} · {show_cur}")
     a, b, c = st.columns(3)
-    a.metric(f"Gold per {ushort}", money(it["xauPrice"] * mult, show_cur),
-             f"{signed(it['chgXau'] * mult, show_cur)} ({it['pcXau']:+.2f}%)")
-    b.metric(f"Silver per {ushort}", money(it["xagPrice"] * mult, show_cur),
-             f"{signed(it['chgXag'] * mult, show_cur)} ({it['pcXag']:+.2f}%)")
+    def delta(k):
+        pc = it[f"pc{k}"]
+        return None if pd.isna(pc) else f"{signed(it[f'chg{k}'] * mult, show_cur)} ({pc:+.2f}%)"
+
+    a.metric(f"Gold per {ushort}", money(it["xauPrice"] * mult, show_cur), delta("Xau"))
+    b.metric(f"Silver per {ushort}", money(it["xagPrice"] * mult, show_cur), delta("Xag"))
     c.metric("Gold / silver ratio", f"{it['xauPrice'] / it['xagPrice']:.1f}",
              help="Ounces of silver needed to buy one ounce of gold.")
     now = datetime.now(IST)
-    st.caption(("⚠️ Live feed unreachable, showing " if stale else "goldprice.org · ")
+    src = data.get("source", "")
+    src_note = {"goldprice.org": "goldprice.org",
+                "gold-api.com": "gold-api.com spot (goldprice.org blocks cloud servers) · FX by open.er-api.com · "
+                                "day change from COMEX futures"}.get(src, src)
+    st.caption(("⚠️ Live feed unreachable, showing " if stale else f"Source: {src_note} · ")
                + f"{data['date']} · checked {now:%d %b %Y %H:%M:%S} IST · refreshes every minute")
 
     rows = []
@@ -152,7 +159,8 @@ def live_panel(cur: str, mult: float, ushort: str):
         row = {"Metal": name}
         for u, m in UNITS.items():
             row[f"per {UNIT_SHORT[u]}"] = money(it[f"{k}Price"] * m, show_cur)
-        row["Change"] = f"{signed(it['chg' + k.capitalize()], show_cur)} ({it['pc' + k.capitalize()]:+.2f}%)"
+        pc = it["pc" + k.capitalize()]
+        row["Change"] = "–" if pd.isna(pc) else f"{signed(it['chg' + k.capitalize()], show_cur)} ({pc:+.2f}%)"
         row["Prev close /oz"] = money(it[f"{k}Close"], show_cur)
         rows.append(row)
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
@@ -188,7 +196,7 @@ if FG.RATES_CSV.exists():
     h = pd.read_csv(FG.RATES_CSV)
     hc = cur if cur in h["Currency"].unique() else "USD"
     h = h[h["Currency"] == hc]
-    st.caption(f"goldprice.org spot saved at every scheduled run (11:30 AM and 3:00 PM IST), in {hc}, "
+    st.caption(f"Spot price saved at every scheduled run (11:30 AM and 3:00 PM IST), in {hc}, "
                f"per {ushort}. Change is versus the previous saved reading.")
     piv = h.assign(Stamp=h["Date"] + " " + h["Time (IST)"]).pivot_table(
         index="Stamp", columns="Metal", values="Per oz", aggfunc="last").sort_index()
@@ -246,4 +254,4 @@ else:
     tech_tab.render_analysis(ohlc, f"{metal} ({tcur}/{'oz' if u == 1 else 'g'})", view,
                              lambda v: money(v, tcur), key="g", sym=SYM[tcur])
 
-st.caption("Sources: goldprice.org (live spot), Yahoo Finance (COMEX history). For research only, not investment advice.")
+st.caption("Sources: goldprice.org / gold-api.com (live spot), [Rates by Exchange Rate API](https://www.exchangerate-api.com) (currency conversion), Yahoo Finance (COMEX history). For research only, not investment advice.")

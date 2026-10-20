@@ -44,7 +44,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add gold_rates.xlsx silver_rates.xlsx
-          git add global_history.csv global_rates.csv 2>/dev/null || true
+          for f in global_history.csv global_rates.csv; do if [ -f "$f" ]; then git add "$f"; fi; done
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
